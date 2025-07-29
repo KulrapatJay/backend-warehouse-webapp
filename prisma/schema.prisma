@@ -1,0 +1,207 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model prefixes {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique @db.VarChar(50)
+  users users[]
+}
+
+model roles {
+  id        Int     @id @default(autoincrement())
+  role_name String  @unique @db.VarChar(50)
+  users     users[]
+}
+
+model users {
+  id          Int       @id @default(autoincrement())
+  employee_id String    @unique @db.VarChar(20)
+  prefix_id   Int
+  first_name  String    @db.VarChar(100)
+  last_name   String    @db.VarChar(100)
+  username    String    @unique @db.VarChar(50)
+  password    String    @db.VarChar(255)
+  role_id     Int
+  is_active   Boolean   @default(true)
+  last_login  DateTime?
+  created_at  DateTime?
+  updated_at  DateTime?
+
+  // relations
+  prefix prefixes @relation(fields: [prefix_id], references: [id])
+  role   roles    @relation(fields: [role_id], references: [id])
+
+  inventory_movements       inventory_movements[]       @relation("UserCreated")
+  production_receipt_orders production_receipt_orders[] @relation("UserReceipt")
+  stock_reports             stock_reports[]             @relation("UserReport")
+  sales_orders              sales_orders[]              @relation("UserSale")
+}
+
+model warehouses {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique @db.VarChar(100)
+  location   String?   @db.VarChar(255)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  product_stocks product_warehouses[]
+  inventory_src  inventory_movements[] @relation("SrcWarehouse")
+  inventory_dest inventory_movements[] @relation("DestWarehouse")
+}
+
+model product_categories {
+  id            Int        @id @default(autoincrement())
+  category_name String     @unique @db.VarChar(100)
+  products      products[]
+}
+
+model units_of_measure {
+  id        Int        @id @default(autoincrement())
+  unit_name String     @unique @db.VarChar(50)
+  products  products[]
+}
+
+model products {
+  id           Int       @id @default(autoincrement())
+  product_name String    @db.VarChar(255)
+  sku          String    @unique @db.VarChar(50)
+  category_id  Int
+  unit_id      Int
+  price        Decimal   @db.Decimal(10, 2)
+  image_url    String?   @db.VarChar(255)
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+
+  category product_categories @relation(fields: [category_id], references: [id])
+  unit     units_of_measure   @relation(fields: [unit_id], references: [id])
+
+  product_stocks      product_warehouses[]
+  inventory_movements inventory_movements[]
+  production_items    production_receipt_items[]
+  sales_items         sales_order_items[]
+}
+
+model product_warehouses {
+  id           Int       @id @default(autoincrement())
+  product_id   Int
+  warehouse_id Int
+  quantity     Int       @default(0)
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+
+  product   products   @relation(fields: [product_id], references: [id])
+  warehouse warehouses @relation(fields: [warehouse_id], references: [id])
+}
+
+model inventory_movements {
+  id                       Int       @id @default(autoincrement())
+  product_id               Int
+  movement_type            String    @db.VarChar(50)
+  quantity_moved           Int
+  movement_date            DateTime
+  created_by               Int
+  source_warehouse_id      Int?
+  destination_warehouse_id Int?
+  notes                    String?   @db.VarChar(500)
+  created_at               DateTime? @default(now())
+  updated_at               DateTime? @updatedAt
+
+  product               products    @relation(fields: [product_id], references: [id])
+  creator               users       @relation("UserCreated", fields: [created_by], references: [id])
+  source_warehouse      warehouses? @relation("SrcWarehouse", fields: [source_warehouse_id], references: [id])
+  destination_warehouse warehouses? @relation("DestWarehouse", fields: [destination_warehouse_id], references: [id])
+}
+
+model production_receipt_orders {
+  id                      Int       @id @default(autoincrement())
+  created_by              Int
+  receipt_date            DateTime  @db.Timestamp(6)
+  status                  String    @db.VarChar(50) // เช่น 'PENDING', 'RECEIVED', 'CANCELLED'
+  total_quantity_expected Int       @db.Integer // จำนวนรวมที่คาดว่าจะได้รับ
+  notes                   String?   @db.VarChar(500)
+  created_at              DateTime? @default(now())
+  updated_at              DateTime? @updatedAt
+
+  creator users                      @relation("UserReceipt", fields: [created_by], references: [id])
+  items   production_receipt_items[]
+}
+
+model production_receipt_items {
+  id                    Int       @id @default(autoincrement())
+  production_receipt_id Int
+  product_id            Int
+  quantity_expected     Int       @db.Integer
+  quantity_received     Int       @default(0) @db.Integer
+  unit_cost             Decimal   @db.Decimal(10, 2)
+  created_at            DateTime? @default(now())
+
+  receipt production_receipt_orders @relation(fields: [production_receipt_id], references: [id])
+  product products                  @relation(fields: [product_id], references: [id])
+}
+
+model stock_reports {
+  id          Int       @id @default(autoincrement())
+  report_date DateTime
+  report_type String    @db.VarChar(50) // ประเภทของรายงาน
+  parameters  Json?     @db.JsonB // พารามิเตอร์สร้างรายงาน
+  notes       String?   @db.VarChar(500)
+  created_by  Int
+  created_at  DateTime? @default(now())
+  updated_at  DateTime? @updatedAt // เก็บ timestamp ตอนแก้ไขล่าสุด
+
+  creator users @relation("UserReport", fields: [created_by], references: [id])
+}
+
+model customers {
+  id            Int       @id @default(autoincrement())
+  customer_code String    @unique @db.VarChar(50)
+  name          String    @db.VarChar(255)
+  address       String?   @db.VarChar(500)
+  phone         String?   @db.VarChar(20)
+  created_at    DateTime? @default(now())
+  updated_at    DateTime? @updatedAt
+
+  sales_orders sales_orders[]
+}
+
+model sales_orders {
+  id           Int       @id @default(autoincrement())
+  order_no     String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id  Int
+  order_date   DateTime
+  created_by   Int
+  total_amount Decimal   @db.Decimal(12, 2)
+  notes        String?   @db.VarChar(500)
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+
+  customer customers           @relation(fields: [customer_id], references: [id])
+  creator  users               @relation("UserSale", fields: [created_by], references: [id])
+  items    sales_order_items[]
+}
+
+model sales_order_items {
+  id             Int       @id @default(autoincrement())
+  sales_order_id Int
+  product_id     Int
+  quantity       Int
+  unit_price     Decimal   @db.Decimal(10, 2)
+  created_at     DateTime? @default(now())
+  updated_at     DateTime? @updatedAt
+
+  order   sales_orders @relation(fields: [sales_order_id], references: [id])
+  product products     @relation(fields: [product_id], references: [id])
+}

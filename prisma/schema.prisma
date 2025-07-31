@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -37,8 +36,8 @@ model users {
   role_id     Int
   is_active   Boolean   @default(true)
   last_login  DateTime?
-  created_at  DateTime?
-  updated_at  DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt 
 
   // relations
   prefix prefixes @relation(fields: [prefix_id], references: [id])

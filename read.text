@@ -28,9 +28,17 @@
     - ตามด้วย npx prisma migrate dev --name <--ชื่อที่จะ migrate--> เพื่อลงข้อมูลเข้าไปใน database
 
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+return next(new ConflictException('Username หรือรหัสพนักงานนี้มีผู้ใช้งานแล้ว', ErrorCodes.USER_ALREADY_EXISTS));
     
 AdminJay
 Jay1234
 
 MenagerMax
 Max1234
+
+StaffPluem
+Pluem1234
+
+UserPang
+Pang1234_

@@ -3,7 +3,10 @@ const express = require("express");
 const cors = require("cors");
 const { swaggerUi, swaggerSpecs } = require("./swagger");
 const cookieParser = require("cookie-parser");
-const authRouter = require("./routes/auth");
+const rootRouter = require("./routes");
+const errorMiddleware = require("./middlewares/error");
+const { PrismaClient } = require('@prisma/client');
+
 
 const app = express();
 
@@ -16,14 +19,18 @@ app.use(
     credentials: true,
   })
 );
-
 app.use(cookieParser());
-app.use("/auth", authRouter);
+app.use("/api", rootRouter);
+
+const prismaClient = new PrismaClient({
+  log:['query']
+})
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
-
+app.use(errorMiddleware)
 
 app.listen(PORT, () => {
-  console.log("Server is running on port " + PORT);
+  console.log("Server is running");
 });
 

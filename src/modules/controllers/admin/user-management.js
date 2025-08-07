@@ -1,6 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const express = require('express');
+
 
 const GetUsers = async (req, res) => {
     const users = await prisma.users.findMany({
@@ -26,6 +26,34 @@ const GetUsers = async (req, res) => {
       res.json(users);
 }
 
+const UpdateUser = async (req, res) => {
+  try{
+
+  } catch(err){
+
+  }
+}
+
+const DeleteUser = async (req, res) => {
+  try{
+
+  } catch(err){
+
+  }
+}
+
+const GetUserById = async (req, res) => {
+  try{
+
+  } catch(err){
+
+  }
+}
+
+
 module.exports = {
-    GetUsers
+    GetUsers,
+    UpdateUser,
+    DeleteUser,
+    GetUserById
 };

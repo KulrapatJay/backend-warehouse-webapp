@@ -1,8 +1,7 @@
 const { HttpException } = require('./root');
 
 class UnauthorizedException extends HttpException {
-  // message, errorCode, errors
-  constructor(message, errors, errorCode) {
+  constructor(message, errorCode, errors) {
     super(message, errorCode, 401, errors);
   }
 }

@@ -11,8 +11,7 @@ const { RegisterSchema } = require('../schema/users');
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const register = async (req, res, next) => {
-    const validatedBody = RegisterSchema.parse(req.body);
-    const { employee_id, prefix_id, first_name, last_name, username, password, role_id } = validatedBody;
+    const { employee_id, prefix_id, first_name, last_name, username, password, role_id } = RegisterSchema.parse(req.body);
 
     const existingUser = await prisma.users.findFirst({
         where: {

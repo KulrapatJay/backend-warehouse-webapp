@@ -33,6 +33,32 @@ const RegisterSchema = z.object({
     })
 });
 
+const UpdateUserSchema = z.object({
+  first_name: z.string({
+    required_error: 'กรุณากรอกชื่อจริง'
+  }).min(1, 'กรุณากรอกชื่อจริง').optional(),
+
+  last_name: z.string({
+    required_error: 'กรุณากรอกนามสกุล'
+  }).min(1, 'กรุณากรอกนามสกุล').optional(),
+
+  username: z.string({
+    required_error: 'กรุณากรอก Username'
+  }).min(3, 'Username ต้องมีอย่างน้อย 3 ตัวอักษร').optional(),
+
+  role_id: z.number({
+    required_error: 'กรุณาระบุตำแหน่ง'
+  }).optional(),
+
+  password: z.string({
+    required_error: 'กรุณากรอกรหัสผ่าน'
+  }).regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/,
+    'รหัสผ่านต้องยาว ≥6 และมี a-z, A-Z, ตัวเลข และอักขระพิเศษ'
+  ).optional()
+});
+
 module.exports = {
-    RegisterSchema
+    RegisterSchema,
+    UpdateUserSchema,
 };

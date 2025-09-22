@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const { ErrorCodes } = require("../../../exception/root");
+const NotFoundException  = require("../../../exception/not-found");
 const { UpdateUserSchema } = require('../../../schema/users');
 const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
@@ -60,20 +61,46 @@ const DeleteUser = async (req, res) => {
     });
     return res.json({ message: "User deleted successfully" });
   } catch (err) {
-    throw new NotFoundException("User not found", ErrorCodes.USER_NOT_FOUND);
+    if (err?.code === 'P2025') {
+      throw new NotFoundException('User not found', ErrorCodes.USER_NOT_FOUND);
+    }
+    throw err;
   }
 };
 
 const GetUserById = async (req, res) => {
   try {
-      const users = await prisma.users.findFirstOrThrow({
-          where: { 
-            id: +req.params.id
-          }
-      })
-      res.json(users)
+    const id = parseInt(req.params.id, 10);
+    const user = await prisma.users.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        employee_id: true,
+        prefix: {
+          select: {
+            name: true,
+          },
+        },
+        first_name: true,
+        last_name: true,
+        username: true,
+        role: {
+          select: {
+            role_name: true,
+          },
+        },
+        last_login: true,
+        updated_at: true,
+      }
+    });
+    
+    if (!user) {
+      throw new NotFoundException('User not found', ErrorCodes.USER_NOT_FOUND);
+    }
+    
+    res.json(user);
   } catch (err) {
-    throw new NotFoundException("User not found", ErrorCodes.USER_NOT_FOUND);
+    throw err;
   }
 };
 

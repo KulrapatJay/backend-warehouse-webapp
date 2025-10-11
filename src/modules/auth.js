@@ -90,7 +90,7 @@ const login = async (req, res, next) => {
     await prisma.$executeRaw`UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = ${user.id}`;
 
     const token = jwt.sign(
-        { id: user.id, username: user.username, role_id: user.role_id },
+        { id: user.id, username: user.username, role: user.role.role_name },
         JWT_SECRET,
         { expiresIn: '1h' }
     );

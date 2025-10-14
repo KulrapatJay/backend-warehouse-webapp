@@ -43,8 +43,23 @@ const staffMiddleware = async (req, res, next) => {
     }
 };
 
-    
+const staffOrManagerMiddleware = async (req, res, next) => {
+    const user = req.user;
+
+    if (!user) {
+        return next(new UnauthorizedException('Authentication failed', ErrorCodes.UNAUTHORIZED));
+    }
+
+    if (user.role_id === 3 || user.role_id === 2) {
+        next();
+    } else {
+        return next(new UnauthorizedException('Unauthorized', ErrorCodes.UNAUTHORIZED));
+    }
+};
+
 module.exports = {
-    staffMiddleware,
+    adminMiddleware,
     menagerMiddleware,
-    adminMiddleware};
+    staffMiddleware,
+    staffOrManagerMiddleware,   
+};

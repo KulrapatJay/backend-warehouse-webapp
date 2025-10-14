@@ -14,6 +14,7 @@ const GetProducts = async (req, res) => {
       product_name: true,
       sku: true,
       price: true,
+      quantity: true,
       category: {
         select: {
           category_name: true,
@@ -34,7 +35,7 @@ const GetProducts = async (req, res) => {
 
 const CreateProduct = async (req, res, next) => {
   try {
-    const { product_name, sku, category_id, unit_id, price } = req.body;
+    const { product_name, sku, category_id, unit_id, price, quantity  } = req.body;
 
     // 1. ตรวจสอบว่ามีสินค้าที่ใช้ SKU นี้อยู่แล้วหรือไม่
     const existingProduct = await prisma.products.findUnique({
@@ -65,6 +66,7 @@ const CreateProduct = async (req, res, next) => {
         category_id: parseInt(category_id),
         unit_id: parseInt(unit_id),
         price: parseFloat(price),
+        quantity: parseInt(quantity),
         image_url: imageUrl,
       },
     });
@@ -78,7 +80,7 @@ const CreateProduct = async (req, res, next) => {
 const UpdateProduct = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { product_name, sku, category_id, unit_id, price } = req.body;
+    const { product_name, sku, category_id, unit_id, price, quantity } = req.body;
 
     let newImageUrl = null;
     if (req.file) {
@@ -108,6 +110,7 @@ const UpdateProduct = async (req, res, next) => {
     if (unit_id)
       setClauses.push(Prisma.sql`unit_id = ${parseInt(unit_id, 10)}`);
     if (price) setClauses.push(Prisma.sql`price = ${parseFloat(price)}`);
+    if (quantity) setClauses.push(Prisma.sql`quantity = ${parseInt(quantity, 10)}`);
     if (newImageUrl) setClauses.push(Prisma.sql`image_url = ${newImageUrl}`);
 
     // ถ้าไม่มีข้อมูลส่งมาให้อัปเดตเลย ก็ไม่ต้องทำอะไร
@@ -162,6 +165,26 @@ const GetProductById = async (req, res) => {
     const products = await prisma.products.findFirstOrThrow({
       where: {
         id: +req.params.id,
+      },
+      select: {
+        id: true,
+        product_name: true,
+        sku: true,
+        price: true,
+        quantity: true,
+        category: {
+          select: {
+            category_name: true,
+          },
+        },
+        unit: {
+          select: {
+            unit_name: true,
+          },
+        },
+        image_url: true,
+        created_at: true,
+        updated_at: true,
       },
     });
     res.json(products);

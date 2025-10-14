@@ -11,7 +11,9 @@ const AddProductSchema = z.object({
   sku: z.string({
     required_error: 'กรุณากรอก SKU'
   }).min(1, 'กรุณากรอก SKU'),
-
+  quantity: z.number({
+    required_error: 'กรุณากรอกจำนวนสินค้า'
+  }).min(0, 'จำนวนสินค้าต้องไม่ติดลบ'),
 });
 
 module.exports = {

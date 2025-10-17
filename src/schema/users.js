@@ -46,6 +46,10 @@ const UpdateUserSchema = z.object({
     required_error: 'กรุณากรอก Username'
   }).min(3, 'Username ต้องมีอย่างน้อย 3 ตัวอักษร').optional(),
 
+  prefix_id: z.number({
+    required_error: 'กรุณาระบุคำนำหน้าชื่อ'
+  }).optional(),
+  
   role_id: z.number({
     required_error: 'กรุณาระบุตำแหน่ง'
   }).optional(),

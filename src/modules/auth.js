@@ -62,7 +62,19 @@ const login = async (req, res, next) => {
                 { username: identifier },
                 { employee_id: identifier }
             ]
-        }
+        },
+        select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                username: true,
+                password: true, 
+                role: {
+                    select: {
+                        role_name: true
+                    }
+                }
+            }
     });
 
     if (!user) {
@@ -78,7 +90,7 @@ const login = async (req, res, next) => {
     await prisma.$executeRaw`UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = ${user.id}`;
 
     const token = jwt.sign(
-        { id: user.id, username: user.username, role_id: user.role_id },
+        { id: user.id, username: user.username, role: user.role.role_name },
         JWT_SECRET,
         { expiresIn: '1h' }
     );
@@ -88,13 +100,21 @@ const login = async (req, res, next) => {
     res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 3600000
+        maxAge: 3600000,
+        path: '/', 
+        sameSite: 'lax' 
     });
 
     return res.status(200).json({
         success: true,
-        message: 'เข้าสู่ระบบสำเร็จ'
-    });
+        message: 'เข้าสู่ระบบสำเร็จ',
+        user: {
+            id: user.id,
+            name: user.first_name + ' ' + user.last_name, // รวมชื่อ-นามสกุล
+            username: user.username,
+            role: user.role?.role_name ?? 'No Role'  // ใช้ Optional Chaining ป้องกัน error
+            }
+        });
 };
 
 const me = async (req, res) => {

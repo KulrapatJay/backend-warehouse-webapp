@@ -80,6 +80,7 @@ model products {
   category_id  Int
   unit_id      Int
   price        Decimal   @db.Decimal(10, 2)
+  quantity     Int       @default(0)
   image_url    String?   @db.VarChar(255)
   created_at   DateTime? @default(now())
   updated_at   DateTime? @updatedAt
@@ -98,6 +99,8 @@ model product_warehouses {
   product_id   Int
   warehouse_id Int
   quantity     Int       @default(0)
+  production_date DateTime? @db.Date
+  expiry_date     DateTime? @db.Date
   created_at   DateTime? @default(now())
   updated_at   DateTime? @updatedAt
 

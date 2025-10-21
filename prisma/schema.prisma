@@ -186,6 +186,7 @@ model sales_orders {
   id           Int       @id @default(autoincrement())
   order_no     String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customer_id  Int
+  status_id    Int       @default(1)
   order_date   DateTime
   created_by   Int
   total_amount Decimal   @db.Decimal(12, 2)
@@ -194,6 +195,7 @@ model sales_orders {
   updated_at   DateTime? @updatedAt
 
   customer customers           @relation(fields: [customer_id], references: [id])
+  status   order_statuses      @relation(fields: [status_id], references: [id])
   creator  users               @relation("UserSale", fields: [created_by], references: [id])
   items    sales_order_items[]
 }
@@ -209,4 +211,12 @@ model sales_order_items {
 
   order   sales_orders @relation(fields: [sales_order_id], references: [id])
   product products     @relation(fields: [product_id], references: [id])
+}
+
+model order_statuses {
+  id          Int    @id @default(autoincrement())
+  status_name String @unique @db.VarChar(50)
+  description String? @db.VarChar(255)
+  
+  sales_orders sales_orders[]
 }

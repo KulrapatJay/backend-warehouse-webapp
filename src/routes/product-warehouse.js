@@ -14,10 +14,10 @@ const apiLimit = rateLimit({
 
 const productsWarehouseRouter = express.Router();
 
-productsWarehouseRouter.get('/', apiLimit, [authMiddleware, staffOrManagerMiddleware] ,errorHandler(GetProductWarehouses));
+productsWarehouseRouter.get('/', apiLimit, [authMiddleware] ,errorHandler(GetProductWarehouses));
 productsWarehouseRouter.post('/', apiLimit, [authMiddleware, staffOrManagerMiddleware] ,errorHandler(CreateProductWarehouse));
 productsWarehouseRouter.put('/:id', apiLimit, [authMiddleware, staffOrManagerMiddleware] ,errorHandler(UpdateProductWarehouse));
-productsWarehouseRouter.get('/:id', apiLimit, [authMiddleware, staffOrManagerMiddleware] ,errorHandler(GetProductWarehouseById));
+productsWarehouseRouter.get('/:id', apiLimit, [authMiddleware] ,errorHandler(GetProductWarehouseById));
 productsWarehouseRouter.delete('/:id', apiLimit, [authMiddleware, staffOrManagerMiddleware] ,errorHandler(DeleteProductWarehouse));
 
 module.exports = productsWarehouseRouter;

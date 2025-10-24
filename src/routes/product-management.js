@@ -17,28 +17,28 @@ const apiLimit = rateLimit({
 
 const productManagementRouter = express.Router();
     
-productManagementRouter.get('/', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetProducts));
+productManagementRouter.get('/', apiLimit, [authMiddleware] ,errorHandler(GetProducts));
 productManagementRouter.post('/', apiLimit, [authMiddleware, menagerMiddleware], upload.single('image'), errorHandler(CreateProduct));
 //ส่วน APT ของ categories
-productManagementRouter.get('/categories', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetCategories));
+productManagementRouter.get('/categories', apiLimit, [authMiddleware] ,errorHandler(GetCategories));
 productManagementRouter.post('/categories', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(CreateCategory));
-productManagementRouter.get('/categories/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetCategoriesById));
+productManagementRouter.get('/categories/:id', apiLimit, [authMiddleware] ,errorHandler(GetCategoriesById));
 productManagementRouter.put('/categories/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(UpdateCategory));
 productManagementRouter.delete('/categories/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(DeleteCategory));
 //ส่วน APT ของหน่วยวัด
-productManagementRouter.get('/units', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetUnitName));
+productManagementRouter.get('/units', apiLimit, [authMiddleware] ,errorHandler(GetUnitName));
 productManagementRouter.post('/units', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(CreateUnitName));
-productManagementRouter.get('/units/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetUnitsById));
+productManagementRouter.get('/units/:id', apiLimit, [authMiddleware] ,errorHandler(GetUnitsById));
 productManagementRouter.put('/units/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(UpdateUnitName));
 productManagementRouter.delete('/units/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(DeleteUnitName));
 //ส่วน APT ของคลังสินค้า
-productManagementRouter.get('/warehouses', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetWarehouseName));
+productManagementRouter.get('/warehouses', apiLimit, [authMiddleware] ,errorHandler(GetWarehouseName));
 productManagementRouter.post('/warehouses', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(CreateWarehouseName));
-productManagementRouter.get('/warehouses/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetWarehouseById));
+productManagementRouter.get('/warehouses/:id', apiLimit, [authMiddleware] ,errorHandler(GetWarehouseById));
 productManagementRouter.put('/warehouses/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(UpdateWarehouse));
 productManagementRouter.delete('/warehouses/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(DeleteWarehouse)); 
 productManagementRouter.put('/:id', apiLimit, [authMiddleware, menagerMiddleware] , upload.single('image') ,errorHandler(UpdateProduct));
-productManagementRouter.get('/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(GetProductById));
+productManagementRouter.get('/:id', apiLimit, [authMiddleware] ,errorHandler(GetProductById));
 productManagementRouter.delete('/:id', apiLimit, [authMiddleware, menagerMiddleware] ,errorHandler(DeleteProduct));
 
 module.exports = productManagementRouter;

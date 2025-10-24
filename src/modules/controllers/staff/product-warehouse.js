@@ -26,6 +26,18 @@ const GetProductWarehouses = async (req, res) => {
             location: true,
           },
         },
+        creator: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            prefix: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
         quantity: true,
         production_date: true,
         expiry_date: true,
@@ -44,11 +56,13 @@ const GetProductWarehouses = async (req, res) => {
 
 const CreateProductWarehouse = async (req, res, next) => {
   try {
-    // Validate request body
+    // Validate request body (ไม่ต้องมี created_by แล้ว)
     CreateProductWarehouseSchema.parse(req.body);
 
-    const { product_id, warehouse_id, quantity, production_date, expiry_date } =
-      req.body;
+    const { product_id, warehouse_id, quantity, production_date, expiry_date } = req.body;
+    
+    // ดึง user_id จาก token ที่ decode แล้วใน middleware
+    const created_by = req.user.id;
 
     const existingProduct = await prisma.products.findUnique({
       where: { id: product_id },
@@ -72,7 +86,7 @@ const CreateProductWarehouse = async (req, res, next) => {
       );
     }
 
-    // ใช้ transaction เพื่อให้การสร้าง product_warehouse และอัพเดท product quantity เกิดขึ้นพร้อมกัน
+    // ใช้ transaction
     const result = await prisma.$transaction(async (tx) => {
       // สร้าง product_warehouse ใหม่
       const newProductWarehouse = await tx.product_warehouses.create({
@@ -82,6 +96,7 @@ const CreateProductWarehouse = async (req, res, next) => {
           quantity,
           production_date: production_date ? new Date(production_date) : null,
           expiry_date: expiry_date ? new Date(expiry_date) : null,
+          created_by, // ใช้ user_id จาก token
         },
         select: {
           id: true,
@@ -97,6 +112,18 @@ const CreateProductWarehouse = async (req, res, next) => {
               location: true,
             },
           },
+          creator: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              prefix: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          },
           quantity: true,
           production_date: true,
           expiry_date: true,
@@ -105,7 +132,7 @@ const CreateProductWarehouse = async (req, res, next) => {
         },
       });
 
-      // อัพเดท quantity ในตาราง products (เพิ่มจำนวน)
+      // อัพเดท quantity ในตาราง products
       await tx.products.update({
         where: { id: product_id },
         data: {
@@ -131,20 +158,23 @@ const UpdateProductWarehouse = async (req, res, next) => {
   try {
     UpdateProductWarehouseSchema.parse(req.body);
     const id = parseInt(req.params.id, 10);
-    const { product_id, warehouse_id, quantity, production_date, expiry_date } =
-      req.body;
-    const existingProductWarehouse = await prisma.product_warehouses.findUnique(
-      {
-        where: { id },
-        select: { quantity: true, product_id: true },
-      }
-    );
+    const { product_id, warehouse_id, quantity, production_date, expiry_date } = req.body;
+    
+    // ดึง user_id ของคนที่กำลัง login อยู่
+    const updated_by = req.user.id;
+    
+    const existingProductWarehouse = await prisma.product_warehouses.findUnique({
+      where: { id },
+      select: { quantity: true, product_id: true },
+    });
+    
     if (!existingProductWarehouse) {
       throw new NotFoundException(
         "ไม่พบข้อมูลสินค้าในคลังที่ระบุ",
         ErrorCodes.PRODUCT_NOT_FOUND
       );
     }
+    
     if (product_id) {
       const existingProduct = await prisma.products.findUnique({
         where: { id: product_id },
@@ -157,6 +187,7 @@ const UpdateProductWarehouse = async (req, res, next) => {
         );
       }
     }
+    
     if (warehouse_id) {
       const existingWarehouse = await prisma.warehouses.findUnique({
         where: { id: warehouse_id },
@@ -173,23 +204,20 @@ const UpdateProductWarehouse = async (req, res, next) => {
     const setClauses = [];
 
     if (product_id) setClauses.push(Prisma.sql`product_id = ${product_id}`);
-    if (warehouse_id)
-      setClauses.push(Prisma.sql`warehouse_id = ${warehouse_id}`);
-    if (quantity !== undefined)
-      setClauses.push(Prisma.sql`quantity = ${quantity}`);
-    if (production_date)
-      setClauses.push(
-        Prisma.sql`production_date = ${new Date(production_date)}`
-      );
-    if (expiry_date)
-      setClauses.push(Prisma.sql`expiry_date = ${new Date(expiry_date)}`);
+    if (warehouse_id) setClauses.push(Prisma.sql`warehouse_id = ${warehouse_id}`);
+    if (quantity !== undefined) setClauses.push(Prisma.sql`quantity = ${quantity}`);
+    if (production_date) setClauses.push(Prisma.sql`production_date = ${new Date(production_date)}`);
+    if (expiry_date) setClauses.push(Prisma.sql`expiry_date = ${new Date(expiry_date)}`);
 
     // ถ้าไม่มีข้อมูลส่งมาให้อัปเดตเลย ก็ไม่ต้องทำอะไร
     if (setClauses.length === 0) {
       return res.status(200).json({ message: "ไม่มีข้อมูลที่ต้องอัปเดต" });
     }
-    // เพิ่ม updated_at เข้าไปใน query เสมอ
+    
+    // เพิ่ม created_by (คนที่อัปเดต) และ updated_at เข้าไปใน query เสมอ
+    setClauses.push(Prisma.sql`created_by = ${updated_by}`);
     setClauses.push(Prisma.sql`updated_at = NOW()`);
+    
     // ใช้ transaction เพื่ออัปเดทพร้อมกับปรับ product quantity
     const result = await prisma.$transaction(async (tx) => {
       // รวม clause ทั้งหมดด้วย ','
@@ -200,17 +228,18 @@ const UpdateProductWarehouse = async (req, res, next) => {
         SET ${setQuery} 
         WHERE id = ${id}
       `;
+      
       if (updateResult === 0) {
         throw new NotFoundException(
           "ไม่พบข้อมูลสินค้าในคลังที่ระบุ",
           ErrorCodes.PRODUCT_NOT_FOUND
         );
       }
+      
       // อัปเดท quantity ในตาราง products ถ้ามีการเปลี่ยน quantity
       if (quantity !== undefined) {
         const quantityDifference = quantity - existingProductWarehouse.quantity;
-        const targetProductId =
-          product_id || existingProductWarehouse.product_id;
+        const targetProductId = product_id || existingProductWarehouse.product_id;
 
         if (quantityDifference !== 0) {
           await tx.products.update({
@@ -223,7 +252,8 @@ const UpdateProductWarehouse = async (req, res, next) => {
           });
         }
       }
-      // ดึงข้อมูลที่อัปเดตแล้ว
+      
+      // ดึงข้อมูลที่อัปเดตแล้ว พร้อมข้อมูลคนที่อัปเดต
       const updatedProductWarehouse = await tx.product_warehouses.findUnique({
         where: { id },
         select: {
@@ -240,6 +270,18 @@ const UpdateProductWarehouse = async (req, res, next) => {
               location: true,
             },
           },
+          creator: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              prefix: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          },
           quantity: true,
           production_date: true,
           expiry_date: true,
@@ -250,6 +292,7 @@ const UpdateProductWarehouse = async (req, res, next) => {
 
       return updatedProductWarehouse;
     });
+    
     res.status(200).json({
       message: "อัปเดตข้อมูลสินค้าในคลังสำเร็จ",
       data: result,

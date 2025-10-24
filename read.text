@@ -31,14 +31,26 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 return next(new ConflictException('Username หรือรหัสพนักงานนี้มีผู้ใช้งานแล้ว', ErrorCodes.USER_ALREADY_EXISTS));
     
-AdminJay
-Jay1234
+AdminJay, AdminJay
+Jay1234, Ja1234_
 
-MenagerMax
-Max1234
+ManagerMax, ManagerMax
+Max1234, Max1234_
 
 StaffMax
 Max123_
 
 UserPang
 Pang1234_
+
+User12345
+Aaa123_
+
+
+INSERT INTO order_statuses (status_name, description) VALUES
+('รอดำเนินการ', 'คำสั่งซื้อที่เพิ่งสร้างใหม่'),
+('กำลังจัดเตรียม', 'กำลังเตรียมสินค้า'),
+('พร้อมจัดส่ง', 'สินค้าพร้อมสำหรับจัดส่ง'),
+('กำลังจัดส่ง', 'อยู่ระหว่างการจัดส่ง'),
+('จัดส่งสำเร็จ', 'ลูกค้าได้รับสินค้าแล้ว'),
+('ยกเลิก', 'คำสั่งซื้อถูกยกเลิก');

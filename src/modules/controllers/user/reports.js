@@ -1,12 +1,27 @@
 const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
 const { ErrorCodes } = require("../../../exception/root");
 const NotFoundException = require("../../../exception/not-found");
 const ConflictException = require("../../../exception/conflict");
 const BadRequestException = require("../../../exception/bad-requests");
+const prisma = new PrismaClient();
 
-const getSalesOrders = async (req, res) => {
-    const salesOrders = await prisma.sales_orders.findMany({
+const GetReports = async (req, res) => {
+    // 1. รับค่า Filter จาก Query String
+    const { startDate, endDate } = req.query;
+
+    // 2. สร้างเงื่อนไขการค้นหา (where clause) แบบไดนามิก
+    const whereClause = {};
+
+    if (startDate && endDate) {
+        whereClause.order_date = {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+        };
+    }
+    
+    // 3. ดึงข้อมูลแบบประกอบร่าง (Nested Retrieval)
+    const reports = await prisma.sales_orders.findMany({
+        where: whereClause,
         orderBy: {
             order_date: 'desc'
         },
@@ -14,49 +29,36 @@ const getSalesOrders = async (req, res) => {
             id: true,
             order_date: true,
             total_amount: true,
-            status_id: true, // ใช้สำหรับกรองสถานะ
-            created_at: true,  
-            updated_at: true   
+            created_at: true,
+            updated_at: true,
+            // เเสดงข้อมูล status
+            status: {
+                select: {
+                    id: true, 
+                    status_name: true 
+                }
+            },
+            // เเสดงข้อมูลรายการสั่งซื้อ (items)
+            items: { 
+                select: {
+                    id: true,
+                    quantity: true,
+                    unit_price: true,
+                    // เเสดงข้อมูล product 
+                    product: {
+                        select: {
+                            id: true,
+                            product_name: true,
+                        }
+                    }
+                }
+            },
         }
     });
-    res.json(salesOrders);
-};
 
-const getSalesOrderItems = async (req, res) => {
-    const salesOrderItems = await prisma.sales_order_items.findMany({
-        orderBy: {
-            id: 'desc'
-        },
-        select: {
-            sales_order_id: true,
-            product_id: true,
-            quantity: true,
-            unit_price: true,
-            created_at: true,  
-            updated_at: true 
-        }
-    });
-    res.json(salesOrderItems);
-};
-
-const getProducts = async (req, res) => {
-    const products = await prisma.products.findMany({
-        orderBy: {
-            id: 'asc'
-        },
-        select: {
-            id: true,
-            product_name: true,
-            price: true,
-            created_at: true,  
-            updated_at: true 
-        }
-    });
-    res.json(products);
+    res.json(reports);
 };
 
 module.exports = {
-    getSalesOrders,
-    getSalesOrderItems,
-    getProducts,
+    GetReports,
 };

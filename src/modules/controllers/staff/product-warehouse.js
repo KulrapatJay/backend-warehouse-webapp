@@ -31,6 +31,7 @@ const GetProductWarehouses = async (req, res) => {
           select: {
             product_name: true,
             sku: true,
+            price: true,
             category: {
               select: {
                 category_name: true,

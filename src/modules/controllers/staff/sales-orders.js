@@ -16,7 +16,6 @@ const GetSalesOrders = async (req, res) => {
         notes: true,
         created_at: true,
         updated_at: true,
-        // แสดงข้อมูลลูกค้าแทน customer_id
         customer: {
           select: {
             id: true,
@@ -25,7 +24,6 @@ const GetSalesOrders = async (req, res) => {
             phone: true,
           },
         },
-        // แสดงข้อมูล status แทน status_id
         status: {
           select: {
             id: true,
@@ -33,7 +31,6 @@ const GetSalesOrders = async (req, res) => {
             description: true,
           },
         },
-        // แสดงข้อมูลผู้สร้างแทน created_by
         creator: {
           select: {
             id: true,
@@ -71,7 +68,6 @@ const GetSalesOrders = async (req, res) => {
         created_at: "desc",
       },
     });
-
     res.json(salesOrders);
   } catch (err) {
     throw new NotFoundException(
@@ -613,7 +609,6 @@ const UpdateOrderStatus = async (req, res) => {
     const { status_id } = req.body;
     const updated_by = req.user.id;
 
-    // Validation
     if (!id || isNaN(parseInt(id))) {
       throw new BadRequestException(
         "กรุณาระบุ ID ที่ถูกต้อง",
@@ -630,6 +625,7 @@ const UpdateOrderStatus = async (req, res) => {
       where: { id: parseInt(id) },
       include: {
         status: true,
+        items: true, // เพิ่มข้อมูล items สำหรับการคืนสต็อก
         customer: {
           select: {
             customer_code: true,
@@ -659,12 +655,16 @@ const UpdateOrderStatus = async (req, res) => {
     }
 
     // ตรวจสอบกฎการเปลี่ยนสถานะ
-    if (
-      existingOrder.status.status_name === "จัดส่งสำเร็จ" &&
-      newStatus.status_name !== "จัดส่งสำเร็จ"
-    ) {
+    if (existingOrder.status.status_name === "จัดส่งสำเร็จ") {
       throw new BadRequestException(
-        "ไม่สามารถเปลี่ยนสถานะจาก 'จัดส่งสำเร็จ' เป็นสถานะอื่น",
+        "ไม่สามารถเปลี่ยนสถานะจาก 'จัดส่งสำเร็จ' เป็นสถานะอื่นได้",
+        ErrorCodes.INVALID_STATUS_CHANGE
+      );
+    }
+
+    if (existingOrder.status.status_name === "ยกเลิก") {
+      throw new BadRequestException(
+        "ออเดอร์นี้ถูกยกเลิกแล้ว ไม่สามารถเปลี่ยนสถานะได้",
         ErrorCodes.INVALID_STATUS_CHANGE
       );
     }
@@ -681,8 +681,64 @@ const UpdateOrderStatus = async (req, res) => {
       });
     }
 
-    // อัพเดตสถานะ
+    // อัพเดตสถานะและจัดการสต็อก (ถ้าเป็นการยกเลิก)
     const result = await prisma.$transaction(async (tx) => {
+      // ถ้าเป็นการยกเลิกออเดอร์ → คืนสต็อก
+      if (newStatus.status_name === "ยกเลิก") {
+        // คืนสต็อกสินค้าทั้งหมดในออเดอร์
+        for (const item of existingOrder.items) {
+          // คืนสต็อกใน product_warehouses (ต้องหา warehouse_id จาก inventory_movements)
+          const lastMovement = await tx.inventory_movements.findFirst({
+            where: {
+              product_id: item.product_id,
+              movement_type: "OUT",
+              notes: { contains: existingOrder.order_no },
+            },
+            orderBy: { created_at: "desc" },
+          });
+
+          if (lastMovement && lastMovement.source_warehouse_id) {
+            // คืนสต็อกใน product_warehouses
+            await tx.product_warehouses.updateMany({
+              where: {
+                product_id: item.product_id,
+                warehouse_id: lastMovement.source_warehouse_id,
+              },
+              data: {
+                quantity: {
+                  increment: item.quantity,
+                },
+              },
+            });
+
+            // คืนสต็อกรวมใน products
+            await tx.products.update({
+              where: { id: item.product_id },
+              data: {
+                quantity: {
+                  increment: item.quantity,
+                },
+              },
+            });
+
+            // บันทึก inventory movement การคืนสต็อก
+            await tx.inventory_movements.create({
+              data: {
+                product_id: item.product_id,
+                source_warehouse_id: null,
+                destination_warehouse_id: lastMovement.source_warehouse_id,
+                quantity_moved: item.quantity,
+                movement_type: "IN",
+                movement_date: new Date(),
+                notes: `คืนสต็อก - ยกเลิกออเดอร์ ${existingOrder.order_no}`,
+                created_by: updated_by,
+              },
+            });
+          }
+        }
+      }
+
+      // อัพเดตสถานะออเดอร์
       const updatedOrder = await tx.sales_orders.update({
         where: { id: parseInt(id) },
         data: { status_id },
@@ -711,8 +767,13 @@ const UpdateOrderStatus = async (req, res) => {
       return updatedOrder;
     });
 
+    const message =
+      newStatus.status_name === "ยกเลิก"
+        ? `ยกเลิกออเดอร์สำเร็จ และคืนสต็อกสินค้าแล้ว`
+        : `เปลี่ยนสถานะจาก '${existingOrder.status.status_name}' เป็น '${newStatus.status_name}' สำเร็จ`;
+
     res.json({
-      message: `เปลี่ยนสถานะจาก '${existingOrder.status.status_name}' เป็น '${newStatus.status_name}' สำเร็จ`,
+      message,
       data: {
         id: result.id,
         order_no: result.order_no,
@@ -728,7 +789,6 @@ const UpdateOrderStatus = async (req, res) => {
     ) {
       throw err;
     }
-
     console.error("UpdateOrderStatus error:", err);
     throw new ConflictException(
       "ไม่สามารถอัพเดตสถานะได้",
@@ -935,6 +995,32 @@ const GetSalesOrdersById = async (req, res) => {
   }
 };
 
+const GetStatus = async (req, res) => {
+  try {
+    const statuses = await prisma.order_statuses.findMany({
+      select: {
+        id: true,
+        status_name: true,
+        description: true,
+      },
+      orderBy: {
+        id: "asc",
+      },
+    });
+
+    res.json({
+      message: "ดึงข้อมูลสถานะคำสั่งซื้อสำเร็จ",
+      data: statuses,
+    });
+  } catch (err) {
+    console.error("GetStatus error:", err);
+    throw new ConflictException(
+      "ไม่สามารถดึงข้อมูลสถานะคำสั่งซื้อได้",
+      ErrorCodes.SALES_ORDER_STATUS_FETCH_FAILED
+    );
+  }
+};
+
 module.exports = {
   GetSalesOrders,
   CreateSalesOrder,
@@ -942,4 +1028,5 @@ module.exports = {
   UpdateOrderStatus,
   DeleteSalesOrder,
   GetSalesOrdersById,
+  GetStatus,
 };

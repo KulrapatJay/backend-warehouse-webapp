@@ -110,18 +110,51 @@ const login = async (req, res, next) => {
         message: 'เข้าสู่ระบบสำเร็จ',
         user: {
             id: user.id,
-            name: user.first_name + ' ' + user.last_name, // รวมชื่อ-นามสกุล
+            name: user.first_name + ' ' + user.last_name, 
             username: user.username,
-            role: user.role?.role_name ?? 'No Role'  // ใช้ Optional Chaining ป้องกัน error
+            role: user.role?.role_name ?? 'No Role'  
             }
         });
 };
 
 const me = async (req, res) => {
-    res.json(req.user)
+    try {
+        const user = await prisma.users.findUnique({
+            where: { id: req.user.id },
+            select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                username: true,
+                role: {
+                    select: {
+                        role_name: true
+                    }
+                }
+            }
+        });
+
+        if (!user) {
+            throw new NotFoundException('ไม่พบข้อมูลผู้ใช้', ErrorCodes.USER_NOT_FOUND);
+        }
+
+        res.json({
+            success: true,
+            message: 'ดึงข้อมูลผู้ใช้สำเร็จ',
+            user: {
+                id: user.id,
+                name: user.first_name + ' ' + user.last_name, 
+                username: user.username,
+                role: user.role?.role_name ?? 'No Role'  
+            }
+        });
+    } catch (err) {
+        if (err instanceof NotFoundException) {
+            throw err;
+        }
+        throw new ConflictException('ไม่สามารถดึงข้อมูลผู้ใช้ได้', ErrorCodes.USER_FETCH_FAILED);
+    }
 }
-
-
 
 const testApi = async (req, res) => {
     try {

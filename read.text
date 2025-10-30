@@ -34,7 +34,7 @@ return next(new ConflictException('Username หรือรหัสพนัก
 AdminJay, AdminJay
 Jay1234, Ja1234_
 
-ManagerMax, ManagerMax
+MenagerMax, ManagerMax
 Max1234, Max1234_
 
 StaffMax

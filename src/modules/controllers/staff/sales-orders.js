@@ -7,6 +7,41 @@ const prisma = new PrismaClient();
 
 const GetSalesOrders = async (req, res) => {
   try {
+    const { warehouse_id, type } = req.query; // รับ parameter ใหม่ชื่อ type
+
+    // กรณีที่ 1: หน้า AllProductsPage ร้องขอข้อมูลสินค้าออกทั้งหมด
+    if (type === 'movements') {
+      const movements = await prisma.inventory_movements.findMany({
+        where: {
+          movement_type: "OUT",
+        },
+        // ดึงข้อมูลชื่อคลังสินค้ามาด้วยเพื่อใช้ในการกรอง
+        select: {
+          quantity_moved: true,
+          source_warehouse: { 
+            select: {
+              name: true,
+            }
+          }
+        },
+      });
+      return res.json(movements);
+    }
+    
+    // กรณีที่ 2: หน้าคลังสินค้าย่อยร้องขอข้อมูลเฉพาะคลังนั้นๆ
+    if (warehouse_id) {
+      const movements = await prisma.inventory_movements.findMany({
+        where: {
+          source_warehouse_id: parseInt(warehouse_id),
+          movement_type: "OUT",
+        },
+        select: {
+          quantity_moved: true,
+        },
+      });
+      return res.json(movements);
+    }
+    // --- สิ้นสุดการแก้ไข ---
     const salesOrders = await prisma.sales_orders.findMany({
       select: {
         id: true,

@@ -10,13 +10,17 @@
     "cors": "^2.8.5",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^17.2.0",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
+    "iconv-lite": "^0.7.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemon": "^3.1.10",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "usb": "^1.9.2",
     "zod": "^4.0.5"
   },
   "devDependencies": {

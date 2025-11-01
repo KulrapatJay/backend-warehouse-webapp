@@ -9,8 +9,9 @@ const apiLimit = rateLimit({
     windowMs: 1000 * 60 * 3, 
     max: 100,
     message: 'You have exceeded the 10 requests in 3 minutes limit!',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
-
 const reportsRouter = express.Router();
 
 reportsRouter.get('/', apiLimit, [authMiddleware], errorHandler(GetReports));

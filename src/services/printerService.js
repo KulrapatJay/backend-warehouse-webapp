@@ -1,88 +1,147 @@
-// เปลี่ยนเฉพาะบางบรรทัดจากของเดิม
-
-const escpos = require("escpos");
-escpos.USB = require("escpos-usb");
-const iconv = require("iconv-lite");
+const { ThermalPrinter, PrinterTypes, CharacterSet } = require("node-thermal-printer");
 
 class PrinterService {
   constructor() {
-    this.device = null;
     this.printer = null;
+    this.isConnected = false;
   }
 
   async initialize() {
     try {
-      this.device = new escpos.USB();
-      await new Promise((resolve, reject) => {
-        this.device.open(err => (err ? reject(err) : resolve()));
+      this.printer = new ThermalPrinter({
+        type: PrinterTypes.EPSON,
+        interface: "printer:POS-80C",
+        characterSet: CharacterSet.PC437_USA, 
+        removeSpecialCharacters: false,
+        lineCharacter: "=",
+        driver: require("@thiagoelg/node-printer"),
+        options: {
+          timeout: 5000,
+        },
       });
 
-      // ใช้ CP874 ให้ชัดเจน (จะใช้ "tis-620" ก็ได้ ลองได้ทั้งคู่)
-      this.printer = new escpos.Printer(this.device, { encoding: "cp874" });
-
-      console.log("Printer ES-8803 connected successfully");
+      this.isConnected = true;
+      console.log("Printer POS-80C initialized");
       return true;
     } catch (error) {
-      console.error("Failed to connect to printer:", error);
+      console.error("Failed to initialize printer:", error);
+      this.isConnected = false;
       return false;
     }
   }
 
-  // เข้ารหัสไทย -> CP874 (ถ้าอยากสลับไป TIS-620 เปลี่ยนตรงนี้พอ)
-  encodeThaiText(text) {
+  async checkPrinterStatus() {
     try {
-      return iconv.encode(text ?? "", "cp874");
-    } catch {
-      return Buffer.from(String(text ?? ""), "utf8");
+      if (!this.printer) return false;
+      return this.isConnected;
+    } catch (error) {
+      console.error("Error checking printer status:", error);
+      this.isConnected = false;
+      return false;
+    }
+  }
+
+  async disconnect() {
+    try {
+      if (this.printer) {
+        this.printer = null;
+        this.isConnected = false;
+      }
+      console.log("Printer disconnected successfully");
+      return true;
+    } catch (error) {
+      console.error("Error disconnecting printer:", error);
+      this.isConnected = false;
+      this.printer = null;
+      return false;
     }
   }
 
   async printReceipt(data) {
     if (!this.printer) throw new Error("Printer not initialized");
 
-    return new Promise((resolve, reject) => {
-      const customerName = (data.customer || "ลูกค้าเดินมาเอง").slice(0, 18);
+    try {
+      const customerName = (data.customer || "").slice(0, 30);
 
-      this.printer
-        .font("a")
-        .size(0, 0)
-        .align("ct")
-        .raw(this.encodeThaiText("ใบเสร็จรับเงิน\n"))
-        .text("=========================")
-        .align("ct")
-        .text(`Date: ${new Date(data.date || Date.now()).toLocaleDateString("th-TH")}`)
-        .text(`Time: ${new Date().toLocaleTimeString("th-TH")}`)
-        .text("-------------------------")
-        .text(`Order: ${(data.orderId || "N/A").substring(0, 20)}`)
-        .raw(this.encodeThaiText(`ลูกค้า: ${customerName}\n`))
-        .text("-------------------------")
-        .raw(this.encodeThaiText("รายการสินค้า:\n"));
-
+      this.printer.clear();
+      
+      // หัวใบเสร็จ
+      this.printer.alignCenter();
+      this.printer.setTextSize(1, 1);
+      this.printer.bold(true);
+      this.printer.println("ใบเสร็จรับเงิน");
+      this.printer.bold(false);
+      
+      this.printer.drawLine();
+      
+      // วันที่และเวลา
+      this.printer.setTextNormal();
+      this.printer.println(`วันที่: ${new Date(data.date || Date.now()).toLocaleDateString("th-TH")}`);
+      this.printer.println(`เวลา: ${new Date().toLocaleTimeString("th-TH")}`);
+      this.printer.drawLine();
+      
+      // เลขที่ออเดอร์
+      this.printer.println(`เลขที่: ${(data.orderId || "N/A").substring(0, 20)}`);
+      
+      // ชื่อลูกค้า
+      this.printer.println(`ลูกค้า: ${customerName}`);
+      this.printer.drawLine();
+      
+      // รายการสินค้า
+      this.printer.bold(true);
+      this.printer.println("รายการสินค้า:");
+      this.printer.bold(false);
+      
       if (Array.isArray(data.items)) {
         data.items.forEach((item) => {
-          const itemName = (item.name || "").length > 20 ? item.name.slice(0, 17) + "..." : (item.name || "");
-          this.printer
-            .raw(this.encodeThaiText(`${itemName}\n`))
-            .text(`${item.quantity}x${Number(item.price).toFixed(2)} = ${Number(item.total ?? item.price * item.quantity).toFixed(2)} THB`);
+          const itemName = (item.name || "").length > 30 
+            ? item.name.slice(0, 27) + "..." 
+            : (item.name || "");
+          
+          this.printer.alignLeft();
+          this.printer.println(itemName);
+          this.printer.alignRight();
+          this.printer.println(
+            `${item.quantity} x ${Number(item.price).toFixed(2)} = ${Number(item.total ?? item.price * item.quantity).toFixed(2)} บาท`
+          );
         });
       }
-
-      this.printer
-        .text("-------------------------")
-        .align("rt")
-        .text(`Total: ${Number(data.total || 0).toFixed(2)} THB`)
-        .align("ct")
-        .text("=========================")
-        .raw(this.encodeThaiText("ขอบคุณที่ใช้บริการ!\n"))
-        .text("Thank you for shopping!")
-        .feed(2)
-        .cut()
-        .close(err => (err ? reject(err) : resolve("Print successful")));
-    });
+      
+      this.printer.alignCenter();
+      this.printer.drawLine();
+      
+      // ยอดรวม
+      this.printer.bold(true);
+      this.printer.setTextSize(1, 1);
+      this.printer.alignRight();
+      this.printer.println(`รวมทั้งหมด: ${Number(data.total || 0).toFixed(2)} บาท`);
+      this.printer.bold(false);
+      this.printer.setTextNormal();
+      
+      this.printer.alignCenter();
+      this.printer.drawLine();
+      
+      // ข้อความท้าย
+      this.printer.println("ขอบคุณที่ใช้บริการ");
+      this.printer.println("Thank you!");
+      
+      this.printer.newLine();
+      this.printer.newLine();
+      this.printer.cut();
+      
+      await this.printer.execute();
+      
+      console.log("Print successful");
+      return "Print successful";
+      
+    } catch (error) {
+      console.error("Print receipt error:", error);
+      throw error;
+    }
   }
 
   async close() {
-    if (this.device) await new Promise((resolve) => this.device.close(() => resolve()));
+    return this.disconnect();
   }
 }
 

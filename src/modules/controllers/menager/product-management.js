@@ -2,9 +2,7 @@ const { Prisma, PrismaClient } = require("@prisma/client");
 const { ErrorCodes } = require("../../../exception/root");
 const NotFoundException = require("../../../exception/not-found");
 const ConflictException = require("../../../exception/conflict");
-const { AddProductSchema } = require("../../../schema/product");
-const fs = require("fs");
-const path = require("path");
+const storageService = require("../../../services/storageService");
 const prisma = new PrismaClient();
 
 const GetProducts = async (req, res) => {
@@ -35,16 +33,14 @@ const GetProducts = async (req, res) => {
 
 const CreateProduct = async (req, res, next) => {
   try {
-    const { product_name, sku, category_id, unit_id, price, quantity  } = req.body;
+    const { product_name, sku, category_id, unit_id, price, quantity } = req.body;
 
-    // 1. ตรวจสอบว่ามีสินค้าที่ใช้ SKU นี้อยู่แล้วหรือไม่
     const existingProduct = await prisma.products.findUnique({
       where: {
         sku: sku,
       },
     });
 
-    // 2. ถ้ามีอยู่แล้ว ให้โยน ConflictException
     if (existingProduct) {
       throw new ConflictException(
         "A product with this SKU already exists.",
@@ -52,12 +48,14 @@ const CreateProduct = async (req, res, next) => {
       );
     }
 
-    if (!req.file) {
-      // ใช้ BadRequestsException หรือส่ง response ตรงก็ได้
-      return res.status(400).json({ message: "Image is required." });
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = await storageService.uploadImage(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
     }
-
-    const imageUrl = `/images/products/${req.file.filename}`;
 
     const newProduct = await prisma.products.create({
       data: {
@@ -66,7 +64,7 @@ const CreateProduct = async (req, res, next) => {
         category_id: parseInt(category_id),
         unit_id: parseInt(unit_id),
         price: parseFloat(price),
-        quantity: parseInt(quantity),
+        quantity: quantity ? parseInt(quantity) : 0,
         image_url: imageUrl,
       },
     });
@@ -82,24 +80,32 @@ const UpdateProduct = async (req, res, next) => {
     const id = parseInt(req.params.id, 10);
     const { product_name, sku, category_id, unit_id, price, quantity } = req.body;
 
-    let newImageUrl = null;
-    if (req.file) {
-      const oldProduct = await prisma.products.findUnique({
-        where: { id },
-        select: { image_url: true },
-      });
+    // ดึงข้อมูลสินค้าเก่าก่อน
+    const oldProduct = await prisma.products.findUnique({
+      where: { id },
+      select: { image_url: true },
+    });
 
-      if (oldProduct && oldProduct.image_url) {
-        const oldImagePath = path.join(process.cwd(), `public${oldProduct.image_url}`);
-        fs.unlink(oldImagePath, (err) => {
-          if (err) console.error("Failed to delete old image:", err);
-          else console.log("Successfully deleted old image:", oldImagePath);
-        });
-      }
-      newImageUrl = `/images/products/${req.file.filename}`;
+    if (!oldProduct) {
+      throw new NotFoundException(
+        "Product not found",
+        ErrorCodes.PRODUCT_NOT_FOUND
+      );
     }
 
-    // 2. สร้างส่วนของ SET clause แบบ dynamic
+    let imageUrlToUpdate = oldProduct.image_url; // เก็บ URL เดิมไว้ก่อน
+    
+    // ถ้ามีการอัปโหลดรูปใหม่
+    if (req.file) {
+      // ลบรูปเก่า และอัปโหลดรูปใหม่
+      imageUrlToUpdate = await storageService.updateImage(
+        oldProduct.image_url,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+    }
+
     const setClauses = [];
 
     if (product_name)
@@ -110,21 +116,22 @@ const UpdateProduct = async (req, res, next) => {
     if (unit_id)
       setClauses.push(Prisma.sql`unit_id = ${parseInt(unit_id, 10)}`);
     if (price) setClauses.push(Prisma.sql`price = ${parseFloat(price)}`);
-    if (quantity) setClauses.push(Prisma.sql`quantity = ${parseInt(quantity, 10)}`);
-    if (newImageUrl) setClauses.push(Prisma.sql`image_url = ${newImageUrl}`);
+    if (quantity !== undefined) 
+      setClauses.push(Prisma.sql`quantity = ${parseInt(quantity, 10)}`);
+    
+    // อัปเดต image_url ถ้ามีการเปลี่ยนแปลง
+    if (imageUrlToUpdate !== oldProduct.image_url) {
+      setClauses.push(Prisma.sql`image_url = ${imageUrlToUpdate}`);
+    }
 
-    // ถ้าไม่มีข้อมูลส่งมาให้อัปเดตเลย ก็ไม่ต้องทำอะไร
     if (setClauses.length === 0) {
       return res.status(200).json({ message: "No data provided to update." });
     }
 
-    // เพิ่ม updated_at เข้าไปใน query เสมอ
     setClauses.push(Prisma.sql`updated_at = NOW()`);
 
-    // 3. รวม clause ทั้งหมดด้วย ','
     const setQuery = Prisma.join(setClauses, ", ");
 
-    // 4. สั่ง execute raw query
     const result = await prisma.$executeRaw`
       UPDATE products 
       SET ${setQuery} 
@@ -148,11 +155,32 @@ const UpdateProduct = async (req, res, next) => {
 const DeleteProduct = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    
+    const product = await prisma.products.findUnique({
+      where: { id },
+      select: { image_url: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        "Product not found",
+        ErrorCodes.PRODUCT_NOT_FOUND
+      );
+    }
+
+    if (product.image_url) {
+      await storageService.deleteImage(product.image_url);
+    }
+
     await prisma.products.delete({
       where: { id },
     });
+
     return res.json({ message: "Product deleted successfully" });
   } catch (err) {
+    if (err instanceof NotFoundException) {
+      throw err;
+    }
     throw new NotFoundException(
       "Product not found",
       ErrorCodes.PRODUCT_NOT_FOUND

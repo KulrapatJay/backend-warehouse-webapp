@@ -6,6 +6,7 @@ const productManagementRouter = require('./product-management');
 const productsWarehouseRouter = require('./product-warehouse');
 const salesOrdersRouter = require('./sales-orders');
 const reportsRouter = require('./reports');
+const printRouter = require('./print');
 
 const rootRouter = express.Router();
 
@@ -16,5 +17,6 @@ rootRouter.use('/products', productManagementRouter);
 rootRouter.use('/products-warehouse', productsWarehouseRouter);
 rootRouter.use('/sales-orders', salesOrdersRouter);
 rootRouter.use('/reports', reportsRouter);
+rootRouter.use('/print', printRouter);
 
 module.exports = rootRouter;
